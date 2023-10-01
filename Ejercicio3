@@ -1,0 +1,25 @@
+CREATE OR REPLACE FUNCTION keepcoding.replaceINT (input INT64)
+RETURNS INT64
+LANGUAGE js AS """
+  if (input === null||input==="NULL"||input==="null"||input==="DESCONOCIDO") {
+    return -9999;
+  } else {
+    return input;
+  }
+""";
+
+
+-- Verifica cuantos nulos hay en summary
+--SELECT count(*) FROM `advancedsql-399416.keepcoding.ivr_summary` as summ WHERE summ.detail_calls_steps_module is null;
+
+--Ejecuta consulta
+SELECT 
+  keepcoding.replaceINT(summ.detail_calls_steps_module) as module
+ , keepcoding.replaceINT(summ.detail_calls_total_duration) as duration
+ , keepcoding.replaceINT(summ.repeated_phone_24H) as repearRecall
+ , keepcoding.replaceINT(summ.masiva_lg) as masiva
+ , keepcoding.replaceINT(summ.info_by_phone_lg) as infoPhone
+ , keepcoding.replaceINT(summ.info_by_dni_lg) as infoDNI
+ 
+ FROM `advancedsql-399416.keepcoding.ivr_summary` as summ
+                                                                    

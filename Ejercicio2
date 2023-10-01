@@ -1,0 +1,147 @@
+CREATE OR REPLACE TABLE keepcoding.ivr_summary AS 
+(
+
+WITH tab AS (
+SELECT  
+ROW_NUMBER() OVER(PARTITION BY CAST(detail.calls_ivr_id AS INT64) order by detail.calls_phone_number DESC) AS PPP
+  , ROW_NUMBER() OVER(PARTITION BY CAST(detail.calls_ivr_id AS STRING) order by detail.calls_phone_number DESC) as rn
+  , detail.calls_start_date as start
+  , detail.calls_ivr_id AS detail_calls_ivr_id
+  , count (detail.calls_ivr_id) AS NUMMMM
+  , detail.calls_phone_number AS detail_calls_phone_number
+  , detail.calls_ivr_result AS detail_calls_ivr_result
+  , detail.calls_start_date AS detail_calls_start_date 
+  , detail.calls_end_date AS detail_calls_end_date
+  , detail.calls_total_duration AS detail_calls_total_duration
+  , detail.calls_customer_segment AS detail_calls_customer_segment
+  , detail.calls_ivr_language AS detail_calls_ivr_language
+  , detail.calls_steps_module AS detail_calls_steps_module 
+  , detail.calls_module_aggregation AS detail_calls_module_aggregation
+  , IF(REGEXP_CONTAINS(calls_module_aggregation, r'AVERIA_MASIVA') ,1,0) AS masiva_lg
+  , IF(detail.step_name = "CUSTOMERINFOBYPHONE.TX"
+        AND
+       detail.step_description_error = "DESCONOCIDO" ,1,0) AS info_by_phone_lg
+  , IF(detail.step_name = "CUSTOMERINFOBYDNI.TX"
+        AND
+       detail.step_description_error = "DESCONOCIDO" ,1,0) AS info_by_dni_lg
+ -- , IF(detail.calls_end_date > TIMESTAMP_SUB(detail.calls_start_date, INTERVAL 24 HOUR),1,0) AS repeated_phone_24H
+ -- , IF(detail.calls_start_date < TIMESTAMP_SUB(detail.calls_end_date, INTERVAL 24 HOUR),1,0) AS cause_recall_phone_24H
+  , IF(LAG(detail.calls_start_date) OVER(PARTITION BY CAST(detail.calls_ivr_id AS INT64) ORDER BY detail.calls_start_date)IS NULL,0,1) AS repeated_phone_24H
+  , IF(LAG(detail.calls_end_date) OVER(PARTITION BY CAST(detail.calls_ivr_id AS INT64) ORDER BY detail.calls_end_date) IS NULL,0,1) AS cause_recall_phone_24H
+  , CASE 
+      WHEN (detail.calls_vdn_label = "ABSORPTION")  THEN detail.calls_vdn_label
+      WHEN (detail.calls_vdn_label LIKE "ATC%" )    THEN "FRONT"
+      WHEN (detail.calls_vdn_label LIKE "TECH%")    THEN "TECH"
+      ELSE "RESTO" 
+      END AS vdn_aggregation
+  --, IF(detail.document_type = "DESCONOCIDO",null,detail.document_identification) AS  detail_document_type
+  --, IF(detail.document_identification = "DESCONOCIDO",null,detail.document_identification) AS detail_document_identification 
+  --, IF(detail.customer_phone = "DESCONOCIDO",null,detail.customer_phone) AS detail_customer_phone
+  --, IF(detail.billing_account_id = "DESCONOCIDO",null,detail.billing_account_id) AS detail_billing_account_id
+  --
+ -- , MAX(rn) as maximoRN
+ -- , MAX(tab.NUMMMM) AS maximoNUM
+  FROM `advancedsql-399416.keepcoding.ivr_detail` AS detail
+--WHERE detail.calls_ivr_id = 1670717168.305764
+group by 
+ detail.calls_ivr_id
+  , detail.calls_start_date_id
+  , detail.calls_phone_number
+  , detail.calls_ivr_result
+  , detail.calls_start_date
+  , detail.calls_end_date
+  , detail.calls_total_duration
+  , detail.calls_customer_segment
+  , detail.calls_ivr_language
+  , detail.calls_steps_module
+  , detail.calls_module_aggregation
+  --, detail.document_type
+  --, detail.document_identification
+  --, detail.customer_phone
+  --, detail.billing_account_id
+  , detail.step_name 
+  , detail.step_description_error
+  , detail.calls_vdn_label
+QUALIFY ROW_NUMBER() OVER(PARTITION BY CAST(detail.calls_ivr_id AS STRING) order by detail.calls_ivr_id DESC) =  1
+), nulos as (SELECT
+   detail.document_type
+  , detail.document_identification
+  , detail.customer_phone
+  , detail.billing_account_id
+  ,  SUM(CASE 
+      WHEN (detail.document_type = "DESCONOCIDO")  THEN 0
+      WHEN (detail.document_identification = "DESCONOCIDO")    THEN 0
+      WHEN (detail.customer_phone = "DESCONOCIDO")    THEN 0
+      WHEN (detail.billing_account_id  = "DESCONOCIDO")    THEN 0
+      ELSE 1
+      END) AS isUnknown
+   FROM `advancedsql-399416.keepcoding.ivr_detail` AS detail
+   group by
+    detail.document_type
+  , detail.document_identification
+  , detail.customer_phone
+  , detail.billing_account_id
+   
+)
+SELECT
+ tab.detail_calls_ivr_id
+ --,MAX(tab.rn) as maxRN
+ --,nulos.isUnknown
+ --, tab.start
+ --, tab.rn AS rn
+ --, tab.NUMMMM
+--  , MAX(tab.rn) as maximoRN
+--  , MAX(tab.NUMMMM) AS maximoNUM
+  , tab.detail_calls_phone_number
+  , tab.detail_calls_ivr_result
+  , tab.detail_calls_start_date
+  , tab.detail_calls_end_date
+  , tab.detail_calls_total_duration
+  , tab.detail_calls_customer_segment
+  , tab.detail_calls_ivr_language
+  , tab.detail_calls_steps_module
+  , tab.detail_calls_module_aggregation
+  , nulos.document_type
+  , nulos.document_identification
+  , nulos.customer_phone
+  , nulos.billing_account_id
+  , tab.masiva_lg
+  , tab.info_by_phone_lg
+  , tab.info_by_dni_lg
+  , tab.vdn_aggregation
+  , tab.repeated_phone_24H
+  , tab.cause_recall_phone_24H
+ -- , ROW_NUMBER() OVER(PARTITION BY CAST(tab.detail_calls_ivr_id AS INT64) ORDER BY tab.detail_calls_ivr_id) AS rn_XX
+ -- , RANK () OVER(PARTITION BY tab.rn ORDER BY tab.rn) AS RANKING
+ -- ,MAX(tab.rn)
+  FROM tab as tab
+  LEFT
+  JOIN nulos as nulos ON nulos.isUnknown = 1
+--WHERE tab.detail_customer_phone <> "DESCONOCIDO"
+GROUP BY 
+ tab.detail_calls_ivr_id
+  , tab.start
+  , tab.rn
+  , tab.detail_calls_phone_number
+  , tab.detail_calls_ivr_result
+  , tab.detail_calls_start_date
+  , tab.detail_calls_end_date
+  , tab.detail_calls_total_duration
+  , tab.detail_calls_customer_segment
+  , tab.detail_calls_ivr_language
+  , tab.detail_calls_steps_module
+  , tab.detail_calls_module_aggregation
+  , nulos.document_type
+  , nulos.document_identification
+  , nulos.customer_phone
+  , nulos.billing_account_id
+  , tab.NUMMMM 
+  , nulos.isUnknown
+  , tab.masiva_lg
+  , tab.info_by_phone_lg
+  , tab.info_by_dni_lg
+  , tab.vdn_aggregation
+  , repeated_phone_24H
+  , cause_recall_phone_24H
+QUALIFY ROW_NUMBER() OVER(PARTITION BY CAST(tab.start AS STRING)  ORDER BY tab.start desc) = 1
+)

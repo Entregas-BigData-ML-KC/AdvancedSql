@@ -1,0 +1,38 @@
+CREATE OR REPLACE TABLE keepcoding.ivr_detail AS
+
+SELECT 
+   calls.ivr_id AS calls_ivr_id
+ , IF(calls.phone_number = 'NULL', "DESCONOCIDO", calls.phone_number) AS calls_phone_number
+ , IF(calls.ivr_result = 'NULL', "DESCONOCIDO", calls.ivr_result) AS calls_ivr_result
+ , IF(calls.vdn_label = 'NULL', "DESCONOCIDO", calls.vdn_label) AS calls_vdn_label
+ , calls.start_date AS calls_start_date
+ , REPLACE(
+      CAST(DATE(calls.start_date) AS STRING), "-","") AS calls_start_date_id
+ , calls.end_date AS calls_end_date
+ , REPLACE(
+      CAST(DATE(calls.end_date) AS STRING), "-","") AS calls_end_date_id
+ , calls.total_duration AS calls_total_duration
+ , IF(calls.customer_segment = "NULL", "DESCONOCIDO",calls.customer_segment) AS calls_customer_segment
+ , IF(calls.ivr_language = "NULL", "DESCONOCIDO",calls.ivr_language) AS calls_ivr_language
+ , calls.steps_module AS calls_steps_module
+ , IF(calls.module_aggregation = "NULL", "DESCONOCIDO",calls.module_aggregation) AS calls_module_aggregation
+ , modules.module_sequece AS module_sequece
+ , IF(modules.module_name = "NULL", "DESCONOCIDO",modules.module_name) AS module_name
+ , modules.module_duration AS module_duration
+ , IF(modules.module_result = "NULL", "DESCONOCIDO",modules.module_result) AS module_result
+ , steps.step_sequence AS step_sequence
+ , IF(steps.step_name = "NULL", "DESCONOCIDO", steps.step_name) AS step_name
+ , IF(steps.step_result = "NULL", "DESCONOCIDO",steps.step_result) AS step_result
+ , IF(steps.step_description_error = "NULL", "DESCONOCIDO", steps.step_description_error) AS step_description_error
+ , IF(steps.document_type = "NULL", "DESCONOCIDO", steps.document_type) AS document_type
+ , IF(steps.document_identification = "NULL", "DESCONOCIDO",steps.document_identification) AS document_identification
+ , IF(steps.customer_phone = "NULL", "DESCONOCIDO",steps.customer_phone) AS customer_phone
+ , IF(steps.billing_account_id = "NULL", "DESCONOCIDO",steps.billing_account_id) AS billing_account_id
+  FROM `advancedsql-399416.keepcoding.ivr_calls` AS calls
+LEFT
+JOIN `advancedsql-399416.keepcoding.ivr_modules` AS modules
+ ON calls.ivr_id = modules.ivr_id
+LEFT
+JOIN `advancedsql-399416.keepcoding.ivr_steps`   AS steps
+ ON modules.ivr_id = steps.ivr_id 
+  AND modules.module_sequece = steps.module_sequece;
